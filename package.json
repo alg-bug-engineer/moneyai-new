@@ -1,0 +1,29 @@
+{
+  "name": "moneyai",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "npm run generate:sitemap && vite build",
+    "preview": "vite preview --host 127.0.0.1",
+    "sync:products": "node scripts/sync-products.mjs",
+    "inspect:gamsgo": "node scripts/inspect-gamsgo-products.mjs",
+    "check:catalog": "node scripts/check-catalog-data.mjs",
+    "sync:cron": "bash scripts/sync-products-cron.sh",
+    "generate:sitemap": "node scripts/generate-sitemap.mjs",
+    "deploy": "bash scripts/deploy.sh",
+    "update": "bash scripts/update.sh",
+    "server": "node server.cjs",
+    "start": "npm run build && node server.cjs"
+  },
+  "dependencies": {
+    "alipay-sdk": "^4.14.0",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "nodemailer": "^8.0.7"
+  },
+  "devDependencies": {
+    "vite": "^7.2.4"
+  }
+}

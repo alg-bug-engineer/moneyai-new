@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+Disallow: /checkout
+Disallow: /orders
+Disallow: /admin
+Disallow: /wwlsm
+
+Sitemap: https://www.moneyai.example/sitemap.xml
