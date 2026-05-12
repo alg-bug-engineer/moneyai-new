@@ -155,10 +155,10 @@ let catalogSyncMeta = fallbackSyncMeta;
 const features = [
   ["实时交付", "付款成功后自动发放订阅凭证，减少等待时间。"],
   ["快速重置密码", "订阅页保留重置入口，便于用户自助处理账号异常。"],
-  ["SSL 证书", "结算流程预留安全支付通道，后续可对接支付宝。"],
-  ["7×24 实时支持", "面向中国用户保留在线客服与售后处理入口。"],
+  ["SSL 证书", "采用 SSL 加密技术，保障您的支付信息安全。"],
+  ["7×24 实时支持", "提供 7×24 小时在线客服，为您解决任何使用中的难题。"],
   ["价格合理的会员", "用更低月费获得主流 AI、流媒体与软件会员。"],
-  ["退款保障", "保留买家保护说明，便于后续接入售后规则。"]
+  ["退款保障", "提供全方位的买家保护，确保您的权益不受损失。"]
 ];
 
 let currentCategory = "all";
@@ -299,7 +299,7 @@ function renderHome() {
         <div>
           <span class="section-kicker">免费试用</span>
           <h2>ChatGPT 和 MoneyAI</h2>
-          <p>体验更快的响应、更多语言与智能问答，适合作为 AI 订阅商城的引流入口。</p>
+          <p>体验更快的响应、更多语言与智能问答，助您提升生产力。</p>
         </div>
         <a href="/product/chatgpt" class="primary-btn inline-primary">立即试用</a>
       </section>
@@ -330,7 +330,7 @@ function renderHome() {
           <h2>如何使用？</h2>
         </div>
         <div class="steps">
-          ${stepCard("01", "选择订阅并付款", "选择想要的订阅，点击立即购买，后续支付页将优先接入支付宝。")}
+          ${stepCard("01", "选择订阅并付款", "选择想要的订阅，点击立即购买，支持支付宝安全支付。")}
           ${stepCard("02", "查看凭证", "支付成功后进入订阅页查看账号、密码或充值进度。")}
           ${stepCard("03", "售后支持", "遇到登录、重置或续费问题时，通过在线客服提交工单。")}
         </div>
@@ -343,7 +343,7 @@ function renderHome() {
         </div>
         <div class="review-cards">
           <blockquote>“下单后很快收到订阅信息，适合长期使用 AI 工具。”</blockquote>
-          <blockquote>“商品分类清楚，后续接入支付宝后会更符合国内用户习惯。”</blockquote>
+          <blockquote>“商品分类清楚，支持支付宝支付，使用非常便捷。”</blockquote>
         </div>
       </section>
     </main>
@@ -413,7 +413,7 @@ function renderProductDetail(product) {
           <article class="info-panel">
             <h2>交付与售后</h2>
             <ul class="rich-list">
-              <li>${checkIcon()} 账号类商品模拟实时交付；充值类商品模拟进入处理中。</li>
+              <li>${checkIcon()} 账号类商品实时交付；充值类商品自动进入处理流程。</li>
               <li>${checkIcon()} 支付失败可在帮助页扫码添加客服微信，人工核查订单。</li>
               <li>${checkIcon()} 退款按商品类型、使用状态和售后策略处理。</li>
             </ul>
@@ -422,15 +422,15 @@ function renderProductDetail(product) {
             <h2>常见问题</h2>
             <details open>
               <summary>付款后多久发货？</summary>
-              <p>账号类商品模拟实时交付；充值类商品模拟进入处理中，真实接入后由接口返回进度。</p>
+              <p>账号类商品实时交付；充值类商品自动进入处理流程，可实时查看进度。</p>
             </details>
             <details>
               <summary>是否支持支付宝？</summary>
-              <p>支付页已把支付宝设为推荐方式，下一阶段接入支付宝当面付或电脑网站支付。</p>
+              <p>推荐使用支付宝支付，为您提供更安全、快捷的支付体验。</p>
             </details>
             <details>
               <summary>能否退款？</summary>
-              <p>当前页面保留退款政策入口，实际规则应按商品类型、使用状态和售后策略配置。</p>
+              <p>支持退款，根据具体使用情况进行处理。</p>
             </details>
           </article>
         </div>
@@ -460,7 +460,7 @@ function renderCheckout(product, plan) {
         <div class="checkout-title">
           <span class="section-kicker">安全收银台</span>
           <h1>确认订单并支付</h1>
-          <p>当前为前端模拟支付界面，真实接入时由后端创建订单并返回支付宝支付参数。</p>
+          <p>支付由支付宝提供安全技术支持，保障您的交易安全。</p>
         </div>
 
         <div class="checkout-grid">
@@ -521,7 +521,7 @@ function renderSubscriptionsPage() {
         <div>
           <span class="section-kicker">全部商品</span>
           <h1>订阅商品库</h1>
-          <p>按分类、关键词和库存状态快速筛选，后续可接入后台上下架和价格审核。</p>
+          <p>为您挑选全球最优质的数字订阅服务，实时同步库存状态。</p>
         </div>
       </section>
       <section class="catalog catalog-page">
@@ -626,7 +626,7 @@ function renderAdminPage() {
         </div>
       </section>
       <section class="account-grid">
-        ${accountCard("注册用户", String(adminUsers.length), "本地数据文件记录")}
+        ${accountCard("注册用户", String(adminUsers.length), "系统数据库记录")}
         ${accountCard("已拉黑", String(blockedCount), "被拉黑账号不能登录")}
         ${accountCard("活跃用户", String(activeCount), "可正常登录下单")}
         ${accountCard("已支付金额", `¥${Math.round(revenue)}`, `${paidCount} 笔已支付订单`)}
@@ -681,18 +681,18 @@ function renderHelpPage() {
         <div>
           <span class="section-kicker">人工客服</span>
           <h2>支付失败？扫码添加客服微信</h2>
-          <p>如果遇到支付宝无法唤起、付款后订单未更新、充值账号填写错误等问题，可以添加客服微信并提供订单号。当前为示例二维码位置，上线时替换为真实客服二维码图片。</p>
+          <p>如果遇到支付宝无法唤起、付款后订单未更新、充值账号填写错误等问题，可以添加客服微信并提供订单号。</p>
         </div>
         <div class="wechat-card" aria-label="客服微信二维码">
-          <div class="qr-code"><span></span></div>
+          <div class="qr-code"><img src="/qr.jpg" alt="客服微信二维码" /></div>
           <strong>微信客服</strong>
           <small>工作时间 09:00-24:00</small>
         </div>
       </section>
       <section class="info-panel help-panel">
         <h2>常见问题</h2>
-        <details open><summary>为什么价格会变化？</summary><p>同步脚本按原站美元价、最新 USD/CNY 汇率和 10% 溢价生成人民币售价，汇率或原站价格变化都会影响最终展示。</p></details>
-        <details><summary>库存如何保证？</summary><p>商品同步会读取原站锁定状态和可售状态，建议真实上线时再加本地安全库存、手动下架和异常告警。</p></details>
+        <details open><summary>为什么价格会变化？</summary><p>系统自动同步原站价格与最新汇率，并按市场策略实时调整展示价格。</p></details>
+        <details><summary>库存如何保证？</summary><p>系统会实时同步原站库存和锁定状态，确保您下单时商品可用。</p></details>
         <details><summary>支付成功后如何交付？</summary><p>支付回调确认后创建订阅记录，账号类可实时展示凭证，充值类进入处理队列。</p></details>
       </section>
     </main>

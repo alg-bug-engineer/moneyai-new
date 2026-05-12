@@ -5,4 +5,4 @@ Disallow: /orders
 Disallow: /admin
 Disallow: /wwlsm
 
-Sitemap: https://www.moneyai.example/sitemap.xml
+Sitemap: https://money-ai.cn/sitemap.xml

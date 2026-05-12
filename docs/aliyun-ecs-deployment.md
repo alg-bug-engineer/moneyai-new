@@ -210,15 +210,15 @@ module.exports = {
     {
       name: "moneyai",
       script: "server.cjs",
-      cwd: "/root/workplace/moneyai",
+      cwd: "/root/workplace/moneyai-new",
       instances: 1,
       exec_mode: "fork",
       env: {
         NODE_ENV: "production",
         PORT: "3000"
       },
-      error_file: "/root/workplace/moneyai/logs/pm2-error.log",
-      out_file: "/root/workplace/moneyai/logs/pm2-out.log",
+      error_file: "/root/workplace/moneyai-new/logs/pm2-error.log",
+      out_file: "/root/workplace/moneyai-new/logs/pm2-out.log",
       time: true
     }
   ]

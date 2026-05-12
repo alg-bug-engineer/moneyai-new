@@ -1,7 +1,7 @@
 import "dotenv/config";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 
-const siteUrl = (process.env.SITE_URL || "https://www.moneyai.example").replace(/\/$/, "");
+const siteUrl = (process.env.SITE_URL || "https://money-ai.cn").replace(/\/$/, "");
 const publicDir = new URL("../public/", import.meta.url);
 const catalogUrl = new URL("../data/catalog-data.json", import.meta.url);
 const { products } = JSON.parse(await readFile(catalogUrl, "utf8"));
