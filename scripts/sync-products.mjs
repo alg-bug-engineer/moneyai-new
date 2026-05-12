@@ -1,5 +1,5 @@
 import "dotenv/config";
-import { rename, writeFile } from "node:fs/promises";
+import { mkdir, rename, writeFile } from "node:fs/promises";
 import {
   DEFAULT_PRIORITY_ACCOUNT_ROUTES,
   GAMESGO_PRODUCTS_URL,
@@ -14,7 +14,9 @@ import {
 
 const OUTPUT_FILE = new URL("../src/catalog-data.js", import.meta.url);
 const TEMP_OUTPUT_FILE = new URL("../src/catalog-data.js.tmp", import.meta.url);
-const MARKUP_RATE = Number(process.env.PRICE_MARKUP_RATE || 0.1);
+const DATA_OUTPUT_FILE = new URL("../data/catalog-data.json", import.meta.url);
+const TEMP_DATA_OUTPUT_FILE = new URL("../data/catalog-data.json.tmp", import.meta.url);
+const MARKUP_RATE = readMarkupRate(process.env.PRICE_MARKUP_RATE);
 const MAX_PRODUCTS = readPositiveNumber(process.env.SYNC_PRODUCT_LIMIT, 600);
 const ACCOUNT_ROUTE_LIMIT = readPositiveNumber(process.env.SYNC_ACCOUNT_ROUTE_LIMIT, 40);
 const ACCOUNT_LISTING_LIMIT = readPositiveNumber(process.env.SYNC_ACCOUNT_LISTING_LIMIT, MAX_PRODUCTS);
@@ -62,12 +64,22 @@ async function main() {
     warning: accountResult.errors.length ? accountResult.errors.slice(0, 10).join("; ") : null
   };
 
+  const payload = { syncMeta: meta, products };
   const file = `export const syncMeta = ${JSON.stringify(meta, null, 2)};\n\nexport const products = ${JSON.stringify(products, null, 2)};\n`;
+  await mkdir(new URL("../data/", import.meta.url), { recursive: true });
+  await writeFile(TEMP_DATA_OUTPUT_FILE, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
+  await rename(TEMP_DATA_OUTPUT_FILE, DATA_OUTPUT_FILE);
   await writeFile(TEMP_OUTPUT_FILE, file, "utf8");
   await rename(TEMP_OUTPUT_FILE, OUTPUT_FILE);
   console.log(
-    `Synced ${products.length} products (${accountResult.products.length} account listings + ${legacyProducts.length} SPU). USD/CNY=${exchangeRate}, markup=${MARKUP_RATE * 100}%`
+    `Synced ${products.length} products (${accountResult.products.length} account listings + ${legacyProducts.length} SPU). USD/CNY=${exchangeRate}, markup=${MARKUP_RATE * 100}%, data=${DATA_OUTPUT_FILE.pathname}`
   );
+}
+
+function readMarkupRate(value) {
+  const parsed = Number(value ?? 0.2);
+  if (!Number.isFinite(parsed) || parsed < 0) return 0.2;
+  return parsed;
 }
 
 async function buildLegacyProducts(rawProducts, exchangeRate, syncedAt) {

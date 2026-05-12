@@ -5,7 +5,7 @@ MoneyAI 是一个面向中国用户的数字订阅商城示例项目，前端展
 ## 技术栈
 
 - 前端：Vite + 原生 JavaScript + CSS，入口为 `src/main.js`
-- 商品数据：`src/catalog-data.js`，由同步脚本从上游接口生成
+- 商品数据：默认从 `data/catalog-data.json` 读取；`src/catalog-data.js` 作为前端构建兜底数据，由同步脚本一起生成
 - 后端：Express 5，入口为 `server.cjs`
 - 本地数据：`data/store.json`，保存用户、会话、验证码和订单
 - 支付：`alipay-sdk`
@@ -51,7 +51,7 @@ ALIPAY_GATEWAY=https://openapi.alipay.com/gateway.do
 ALIPAY_NOTIFY_URL=
 
 SITE_URL=https://www.example.com
-PRICE_MARKUP_RATE=0.1
+PRICE_MARKUP_RATE=0.2
 SYNC_PRODUCT_LIMIT=80
 ```
 
@@ -86,21 +86,24 @@ npm run check:catalog
 
 常用同步参数：
 
-- `SYNC_PRODUCT_LIMIT`：最终写入前端的商品总数，默认 `600`
+- `PRICE_MARKUP_RATE`：人民币售价浮动比例，默认 `0.2`，即 20%
+- `SYNC_PRODUCT_LIMIT`：最终写入商品总数，默认 `600`
 - `SYNC_ACCOUNT_ROUTE_LIMIT`：最多检查多少个账号市场路由，默认 `40`
 - `SYNC_ACCOUNT_LISTING_LIMIT`：最多同步多少个账号市场 listing，默认跟随 `SYNC_PRODUCT_LIMIT`
 - `SYNC_ACCOUNT_ROUTES`：手动指定路由，例如 `claude,gemini,cursor`
 - `CATALOG_MIN_ACCOUNT_LISTINGS`：检查时要求的账号市场商品下限
 
-所有商品按 `ceil(美元价 * USD/CNY * (1 + PRICE_MARKUP_RATE))` 生成人民币价格，最后原子替换 `src/catalog-data.js`。
+所有商品按 `ceil(美元价 * USD/CNY * (1 + PRICE_MARKUP_RATE))` 生成人民币价格。同步脚本会先写入 `data/catalog-data.json`，再同步生成 `src/catalog-data.js` 作为前端静态兜底数据。
 
-生产环境必须在同步后重新构建前端，否则 `dist/` 里仍是旧的打包数据：
+生产环境必须在同步后重新构建前端，否则 `dist/` 里仍是旧的打包兜底数据：
 
 ```bash
 npm run sync:products
 npm run check:catalog
 npm run build
 ```
+
+后端运行时的 `/api/catalog` 默认读取 `data/catalog-data.json`；前端加载后会优先请求该接口刷新商品，接口不可用时才使用 `src/catalog-data.js` 中的兜底数据。
 
 ## 一键部署
 
@@ -176,9 +179,9 @@ tail -n 100 logs/product-sync.log
 
 ## 热更新与是否需要重启
 
-当前项目开发环境可以热更新：`npm run dev` 运行时，`src/catalog-data.js` 变化会触发 Vite HMR。
+当前项目开发环境可以热更新：`npm run dev` 运行时，`src/catalog-data.js` 变化会触发 Vite HMR；后端 `/api/catalog` 会读取最新的 `data/catalog-data.json`。
 
-生产环境不是实时推送式热更新。商品数据被打包进 `dist/assets/*.js`，所以 cron 拉取数据后必须执行 `npm run build` 才会影响线上静态文件。
+生产环境不是实时推送式热更新。页面首屏兜底商品数据被打包进 `dist/assets/*.js`，所以 cron 拉取数据后仍建议执行 `npm run build` 更新兜底资源；已加载页面刷新时会优先从 `/api/catalog` 读取 `data/catalog-data.json`。
 
 通常不需要重启网站进程。Express 使用 `dist/` 目录直接服务静态文件，重新 build 后，新访问或刷新页面的用户会拿到新的 `index.html` 和新 hash 的 JS 文件。以下情况才需要重启：
 
@@ -187,7 +190,7 @@ tail -n 100 logs/product-sync.log
 - 修改了需要后端进程重新读取的环境变量
 - 使用了额外缓存层/CDN，且需要重启或清缓存才能看到新资源
 
-已经打开页面的用户不会自动刷新到新商品数据；需要用户刷新页面，或者后续改造为接口拉取商品 JSON 并做前端轮询/长连接。
+已经打开页面的用户不会自动刷新到新商品数据；需要用户刷新页面，刷新后前端会优先请求 `/api/catalog`。
 
 ## 常用命令
 

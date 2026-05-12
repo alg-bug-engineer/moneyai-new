@@ -1,10 +1,10 @@
-import { stat } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 
-const catalogUrl = new URL("../src/catalog-data.js", import.meta.url);
+const catalogUrl = new URL("../data/catalog-data.json", import.meta.url);
 const maxAgeMin = Number(process.env.CATALOG_MAX_AGE_MIN || 0);
 const minProducts = Number(process.env.CATALOG_MIN_PRODUCTS || 1);
 const minAccountListings = Number(process.env.CATALOG_MIN_ACCOUNT_LISTINGS || 0);
-const { syncMeta, products } = await import(`${catalogUrl.href}?check=${Date.now()}`);
+const { syncMeta, products } = JSON.parse(await readFile(catalogUrl, "utf8"));
 
 const errors = [];
 
@@ -69,9 +69,9 @@ if (!syncMeta || typeof syncMeta !== "object") {
 
 try {
   const fileStat = await stat(catalogUrl);
-  if (!fileStat.size) errors.push("src/catalog-data.js is empty");
+  if (!fileStat.size) errors.push("data/catalog-data.json is empty");
 } catch (error) {
-  errors.push(`cannot stat src/catalog-data.js: ${error.message}`);
+  errors.push(`cannot stat data/catalog-data.json: ${error.message}`);
 }
 
 if (errors.length) {

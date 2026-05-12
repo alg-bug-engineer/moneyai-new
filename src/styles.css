@@ -1070,7 +1070,6 @@ details p {
   gap: 10px;
 }
 
-.order-row,
 .admin-product-row {
   display: grid;
   grid-template-columns: 1.5fr 0.7fr 0.7fr 0.7fr;
@@ -1079,6 +1078,106 @@ details p {
   min-height: 58px;
   padding: 12px 0;
   border-top: 1px solid #eee5e0;
+}
+
+.order-card {
+  display: grid;
+  gap: 14px;
+  padding: 18px 0;
+  border-top: 1px solid #eee5e0;
+}
+
+.order-card-main,
+.order-card-meta,
+.order-card-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.order-card h3 {
+  margin: 6px 0;
+  font-size: 20px;
+}
+
+.order-card p,
+.order-id,
+.order-card-meta {
+  color: #766967;
+}
+
+.order-id {
+  font-weight: 800;
+}
+
+.order-money {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  white-space: nowrap;
+}
+
+.order-money strong {
+  font-size: 22px;
+}
+
+.order-card-meta {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  font-size: 14px;
+}
+
+.order-card-actions {
+  justify-content: flex-start;
+}
+
+.order-detail-panel {
+  margin-top: 20px;
+}
+
+.order-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 24px;
+}
+
+.detail-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 16px 0;
+  border-top: 1px solid #eee5e0;
+}
+
+.detail-item span,
+.delivery-box span {
+  color: #766967;
+  font-weight: 800;
+}
+
+.detail-item strong {
+  text-align: right;
+}
+
+.delivery-box {
+  margin-top: 18px;
+  padding: 18px;
+  background: #fff7ef;
+  border: 1px solid #f1ded4;
+  border-radius: 8px;
+}
+
+.delivery-box strong {
+  display: block;
+  margin: 8px 0;
+  font-size: 20px;
+}
+
+.delivery-box p {
+  margin: 0;
+  color: #6b625f;
+  line-height: 1.6;
 }
 
 .admin-page .account-grid {
@@ -1153,7 +1252,6 @@ details p {
   grid-template-columns: 1.8fr 0.55fr 0.65fr 0.8fr 0.4fr;
 }
 
-.order-row small,
 .admin-name small {
   display: block;
   margin-top: 4px;
@@ -1776,7 +1874,22 @@ details p {
     grid-template-columns: 1fr;
   }
 
-  .order-row,
+  .order-card-main,
+  .order-card-actions,
+  .detail-item {
+    display: grid;
+  }
+
+  .order-money,
+  .detail-item strong {
+    justify-content: flex-start;
+    text-align: left;
+  }
+
+  .order-detail-grid {
+    grid-template-columns: 1fr;
+  }
+
   .admin-product-row {
     grid-template-columns: 1fr;
     gap: 8px;

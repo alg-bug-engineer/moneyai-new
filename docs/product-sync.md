@@ -6,12 +6,13 @@
 - 上游覆盖检查：`npm run inspect:gamsgo`
 - 同步脚本：`scripts/sync-products.mjs`
 - 数据源工具：`scripts/gamsgo-source.mjs`
-- 前台商品数据：`src/catalog-data.js`
+- 运行时商品数据：`data/catalog-data.json`
+- 前台兜底数据：`src/catalog-data.js`
 - 原站 SPU 接口：`https://api.gamsgo2.com/index/getSpuList`
 - 账号市场路由：`https://www.gamsgo.com/accounts_zh.xml`
 - 账号市场接口：`https://mapi.gamsgo2.com/index/typeCategory`、`https://mapi.gamsgo2.com/index/planList`
 - 汇率接口：`https://open.er-api.com/v6/latest/USD`
-- 人民币价公式：`ceil(原站美元价 * USD/CNY * 1.10)`
+- 人民币价公式：`ceil(原站美元价 * USD/CNY * (1 + PRICE_MARKUP_RATE))`，默认浮动 20%
 
 同步脚本会先拉取旧版 SPU 商品列表，读取 `min_price`、`lock_status`、`vip_status`、描述、图片等字段，再对每个商品调用 `/index/detail` 同步 `introduction`、`how_it_works`、`support_device` 等详情内容。
 
@@ -24,6 +25,7 @@
 - `SYNC_ACCOUNT_LISTING_LIMIT`：最多同步多少个账号市场 listing，默认跟随 `SYNC_PRODUCT_LIMIT`
 - `SYNC_ACCOUNT_LISTINGS_PER_ROUTE`：单个账号路由最多同步多少条 listing，默认 `500`
 - `SYNC_ACCOUNT_ROUTES`：手动指定路由，例如 `claude,gemini,cursor`
+- `PRICE_MARKUP_RATE`：人民币售价浮动比例，默认 `0.2`
 - `CATALOG_MIN_ACCOUNT_LISTINGS`：`npm run check:catalog` 的账号市场商品下限
 
 ## 手动触发
@@ -35,7 +37,7 @@ npm run check:catalog
 npm run build
 ```
 
-前台开发环境会通过 Vite 热更新读取新生成的 `src/catalog-data.js`。
+同步后会写入 `data/catalog-data.json`，并生成 `src/catalog-data.js` 作为前端静态兜底数据。后端 `/api/catalog` 默认读取 `data/catalog-data.json`，前端启动后会优先使用该接口返回的数据。
 
 ## 定时触发
 
@@ -51,7 +53,7 @@ Cron 示例：
 
 ## 热更新与重启
 
-开发环境运行 `npm run dev` 时，`src/catalog-data.js` 变更会触发 Vite HMR。
+开发环境运行 `npm run dev` 时，`src/catalog-data.js` 变更会触发 Vite HMR；后端接口读取的 `data/catalog-data.json` 会在下一次 `/api/catalog` 请求时生效。
 
 生产环境中商品数据已经被打包进 `dist/assets/*.js`。同步后必须重新执行 `npm run build` 才会生成新的静态资源；通常不需要重启 `server.cjs`，因为 Express 会从磁盘服务最新的 `dist/` 文件。只有修改后端代码、依赖、Node 版本或需要后端进程重新读取的环境变量时，才需要重启网站进程。
 

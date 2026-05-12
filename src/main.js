@@ -1,5 +1,5 @@
 import "./styles.css";
-import { products as syncedProducts, syncMeta } from "./catalog-data.js";
+import { products as fallbackSyncedProducts, syncMeta as fallbackSyncMeta } from "./catalog-data.js";
 
 const categories = [
   { id: "all", label: "全部", icon: gridIcon() },
@@ -149,7 +149,8 @@ const products = [
   }
 ];
 
-const catalogProducts = mergeCatalogProducts(products, syncedProducts);
+let catalogProducts = mergeCatalogProducts(products, fallbackSyncedProducts);
+let catalogSyncMeta = fallbackSyncMeta;
 
 const features = [
   ["实时交付", "付款成功后自动发放订阅凭证，减少等待时间。"],
@@ -167,10 +168,16 @@ let cookieVisible = false;
 let loginVisible = false;
 let authMode = "login";
 let authMessage = "";
+let authForm = { email: "", code: "", password: "" };
+let authCodeCooldownUntil = Number(localStorage.getItem("moneyai_auth_code_cooldown_until") || 0);
+let authCodeCooldownTimer = null;
 let currentToken = localStorage.getItem("moneyai_token") || "";
 let currentUser = readStoredUser();
 let myOrders = [];
 let myOrdersLoaded = false;
+let myOrdersLoading = false;
+let alipayReturnConfirming = false;
+let alipayReturnHandledOrder = "";
 let adminToken = localStorage.getItem("moneyai_admin_session") || "";
 let adminUsers = [];
 let adminOrders = [];
@@ -221,6 +228,7 @@ function render() {
 
   updatePageMeta(route);
   bindEvents();
+  startAuthCodeCooldownTimer();
 }
 
 function renderHeader() {
@@ -493,6 +501,8 @@ function renderCheckout(product, plan) {
               class="buy-btn"
               data-action="alipay-pay"
               data-product="${escapeHtml(product.name)}"
+              data-product-slug="${productSlug(product)}"
+              data-product-category="${escapeHtml(product.category || "")}"
               data-plan="${escapeHtml(plan.label)}"
               data-amount="${total}"
             >使用支付宝支付</button>
@@ -532,8 +542,9 @@ function renderSubscriptionsPage() {
 
 function renderOrdersPage() {
   const order = catalogProducts[0];
+  const selectedOrder = selectedOrderFromRoute();
   const rows = myOrders.length
-    ? myOrders.map((item) => orderRow(item.outTradeNo, item.productName, orderStatusText(item.status), `¥${item.amount}`, "支付宝")).join("")
+    ? myOrders.map(orderSummaryCard).join("")
     : currentUser && myOrdersLoaded
       ? `<div class="empty-result"><strong>暂无订单</strong><span>选择一个商品后完成支付宝支付，这里会展示订单状态。</span></div>`
       : "";
@@ -564,6 +575,7 @@ function renderOrdersPage() {
           }
         </div>
       </section>
+      ${currentUser && selectedOrder ? renderOrderDetail(selectedOrder) : ""}
     </main>
   `;
 }
@@ -818,22 +830,22 @@ function renderLoginDialog() {
       </div>
       <label class="form-field">
         <span>邮箱地址</span>
-        <input id="authEmail" type="email" autocomplete="email" placeholder="name@example.com" />
+        <input id="authEmail" type="email" autocomplete="email" placeholder="name@example.com" value="${escapeHtml(authForm.email)}" />
       </label>
       ${
         authMode === "register"
           ? `<div class="code-row">
               <label class="form-field">
                 <span>邮箱验证码</span>
-                <input id="authCode" type="text" inputmode="numeric" maxlength="6" placeholder="6 位验证码" />
+                <input id="authCode" type="text" inputmode="numeric" maxlength="6" placeholder="6 位验证码" value="${escapeHtml(authForm.code)}" />
               </label>
-              <button type="button" class="text-link code-button" data-action="send-code">发送验证码</button>
+              <button id="authSendCodeButton" type="button" class="text-link code-button" data-action="send-code" ${getAuthCodeCooldownSeconds() > 0 ? "disabled" : ""}>${authCodeButtonText()}</button>
             </div>`
           : ""
       }
       <label class="form-field">
         <span>密码</span>
-        <input id="authPassword" type="password" autocomplete="${authMode === "login" ? "current-password" : "new-password"}" placeholder="${authMode === "login" ? "请输入密码" : "至少 6 位密码"}" />
+        <input id="authPassword" type="password" autocomplete="${authMode === "login" ? "current-password" : "new-password"}" placeholder="${authMode === "login" ? "请输入密码" : "至少 6 位密码"}" value="${escapeHtml(authForm.password)}" />
       </label>
       ${authMessage ? `<p class="auth-message">${escapeHtml(authMessage)}</p>` : ""}
       <button type="button" class="buy-btn" data-action="${authMode === "login" ? "login" : "register"}">${authMode === "login" ? "登录" : "注册并登录"}</button>
@@ -845,8 +857,8 @@ function renderLoginDialog() {
 function bindEvents() {
   startLivePurchaseTicker();
   const route = getRoute();
-  if (route.type === "orders" && currentUser && !myOrdersLoaded) {
-    loadMyOrders();
+  if (route.type === "orders" && currentUser && !myOrdersLoaded && !myOrdersLoading) {
+    refreshOrdersPage();
   }
   if (route.type === "admin" && adminToken && !adminLoaded) {
     loadAdminData();
@@ -912,6 +924,8 @@ function bindEvents() {
           headers: authHeaders(),
           body: JSON.stringify({
             productName: button.dataset.product,
+            productSlug: button.dataset.productSlug,
+            productCategory: button.dataset.productCategory,
             planLabel: button.dataset.plan,
             totalAmount: button.dataset.amount,
             email: currentUser?.email
@@ -939,15 +953,20 @@ function bindEvents() {
     button.addEventListener("click", () => {
       loginVisible = false;
       authMessage = "";
+      authForm = { email: "", code: "", password: "" };
       render();
     });
   });
   document.querySelectorAll("[data-auth-mode]").forEach((button) => {
     button.addEventListener("click", () => {
+      updateAuthFormFromInputs();
       authMode = button.dataset.authMode;
       authMessage = "";
       render();
     });
+  });
+  document.querySelectorAll("#authEmail, #authCode, #authPassword").forEach((input) => {
+    input.addEventListener("input", updateAuthFormFromInputs);
   });
   document.querySelectorAll("[data-action='send-code']").forEach((button) => {
     button.addEventListener("click", async () => {
@@ -1072,6 +1091,11 @@ async function loginAdmin(button) {
 
 async function sendRegisterCode(button) {
   const email = document.querySelector("#authEmail")?.value.trim();
+  authForm.email = email || "";
+  if (getAuthCodeCooldownSeconds() > 0) {
+    updateAuthCodeButton();
+    return;
+  }
   button.disabled = true;
   button.textContent = "发送中...";
   try {
@@ -1080,18 +1104,61 @@ async function sendRegisterCode(button) {
       body: JSON.stringify({ email })
     });
     authMessage = payload.message || "验证码已发送";
+    startAuthCodeCooldown(300);
   } catch (error) {
     authMessage = error.message;
+    if (error.status === 429 && Number.isFinite(error.retryAfter)) {
+      startAuthCodeCooldown(error.retryAfter);
+    }
   } finally {
     button.disabled = false;
     render();
   }
 }
 
+function startAuthCodeCooldown(seconds) {
+  const safeSeconds = Math.max(1, Math.ceil(Number(seconds) || 300));
+  authCodeCooldownUntil = Date.now() + safeSeconds * 1000;
+  localStorage.setItem("moneyai_auth_code_cooldown_until", String(authCodeCooldownUntil));
+  startAuthCodeCooldownTimer();
+}
+
+function startAuthCodeCooldownTimer() {
+  if (authCodeCooldownTimer || getAuthCodeCooldownSeconds() <= 0) return;
+  updateAuthCodeButton();
+  authCodeCooldownTimer = window.setInterval(() => {
+    updateAuthCodeButton();
+    if (getAuthCodeCooldownSeconds() <= 0) {
+      window.clearInterval(authCodeCooldownTimer);
+      authCodeCooldownTimer = null;
+      localStorage.removeItem("moneyai_auth_code_cooldown_until");
+    }
+  }, 1000);
+}
+
+function updateAuthCodeButton() {
+  const button = document.querySelector("#authSendCodeButton");
+  if (!button) return;
+  const seconds = getAuthCodeCooldownSeconds();
+  button.disabled = seconds > 0;
+  button.textContent = authCodeButtonText();
+}
+
+function authCodeButtonText() {
+  const seconds = getAuthCodeCooldownSeconds();
+  return seconds > 0 ? `${seconds} 秒后重发` : "发送验证码";
+}
+
+function getAuthCodeCooldownSeconds() {
+  const seconds = Math.ceil((authCodeCooldownUntil - Date.now()) / 1000);
+  return seconds > 0 ? seconds : 0;
+}
+
 async function submitAuth(button, mode) {
   const email = document.querySelector("#authEmail")?.value.trim();
   const password = document.querySelector("#authPassword")?.value || "";
   const code = document.querySelector("#authCode")?.value.trim() || "";
+  authForm = { email: email || "", password, code };
   button.disabled = true;
   button.textContent = mode === "login" ? "登录中..." : "注册中...";
   try {
@@ -1105,6 +1172,7 @@ async function submitAuth(button, mode) {
     localStorage.setItem("moneyai_user", JSON.stringify(currentUser));
     loginVisible = false;
     authMessage = "";
+    authForm = { email: "", code: "", password: "" };
     myOrdersLoaded = false;
   } catch (error) {
     authMessage = error.message;
@@ -1114,16 +1182,70 @@ async function submitAuth(button, mode) {
   }
 }
 
+function updateAuthFormFromInputs() {
+  const emailInput = document.querySelector("#authEmail");
+  const codeInput = document.querySelector("#authCode");
+  const passwordInput = document.querySelector("#authPassword");
+  authForm = {
+    email: emailInput ? emailInput.value.trim() : authForm.email,
+    code: codeInput ? codeInput.value.trim() : authForm.code,
+    password: passwordInput ? passwordInput.value : authForm.password
+  };
+}
+
 async function loadMyOrders() {
+  myOrdersLoading = true;
   try {
-    const payload = await apiJson("/api/my/orders", { method: "GET", headers: authHeaders() });
+    const payload = await apiJson("/api/my/orders", { method: "GET", headers: authHeaders(), cache: "no-store" });
     myOrders = payload.orders || [];
     myOrdersLoaded = true;
-  } catch {
-    myOrders = [];
+  } catch (error) {
+    if (error.status === 401) myOrders = [];
     myOrdersLoaded = true;
+  } finally {
+    myOrdersLoading = false;
   }
-  render();
+}
+
+async function refreshOrdersPage() {
+  try {
+    await confirmAlipayReturnIfNeeded();
+    await loadMyOrders();
+  } finally {
+    render();
+  }
+}
+
+async function confirmAlipayReturnIfNeeded() {
+  const params = currentQueryParams();
+  const outTradeNo = params.get("out_trade_no") || params.get("order") || "";
+  if (params.get("payment") !== "return" || !outTradeNo || alipayReturnConfirming || alipayReturnHandledOrder === outTradeNo) return;
+
+  alipayReturnConfirming = true;
+  try {
+    await apiJson("/api/orders/alipay/return", {
+      method: "POST",
+      headers: authHeaders(),
+      cache: "no-store",
+      body: JSON.stringify({
+        outTradeNo,
+        tradeNo: params.get("trade_no") || "",
+        totalAmount: params.get("total_amount") || "",
+        returnPayload: Object.fromEntries(params.entries())
+      })
+    });
+    alipayReturnHandledOrder = outTradeNo;
+    window.history.replaceState(null, "", "/orders");
+  } catch {
+    alipayReturnHandledOrder = outTradeNo;
+  } finally {
+    alipayReturnConfirming = false;
+  }
+}
+
+function currentQueryParams() {
+  const query = window.location.hash.startsWith("#/") ? window.location.hash.split("?")[1] || "" : window.location.search.slice(1);
+  return new URLSearchParams(query);
 }
 
 async function loadAdminData() {
@@ -1159,9 +1281,22 @@ async function apiJson(url, options = {}) {
   if (!response.ok) {
     const error = new Error(payload.message || "请求失败");
     error.status = response.status;
+    if (Number.isFinite(Number(payload.retryAfter))) error.retryAfter = Number(payload.retryAfter);
     throw error;
   }
   return payload;
+}
+
+async function loadCatalogData() {
+  try {
+    const payload = await apiJson("/api/catalog", { method: "GET" });
+    if (!Array.isArray(payload.products) || !payload.products.length) return;
+    catalogProducts = mergeCatalogProducts(products, payload.products);
+    catalogSyncMeta = payload.syncMeta || catalogSyncMeta;
+    render();
+  } catch {
+    catalogProducts = mergeCatalogProducts(products, fallbackSyncedProducts);
+  }
 }
 
 function adminApi(url, options = {}) {
@@ -1351,15 +1486,108 @@ function accountCard(title, value, note) {
   `;
 }
 
-function orderRow(id, productName, status, amount, payment) {
+function orderSummaryCard(order) {
+  const product = orderProduct(order);
+  const paid = order.status === "paid";
   return `
-    <div class="order-row">
-      <span><strong>${id}</strong><small>${productName}</small></span>
-      <span>${status}</span>
-      <span>${amount}</span>
-      <span>${payment}</span>
+    <article class="order-card ${paid ? "is-paid" : ""}">
+      <div class="order-card-main">
+        <div>
+          <span class="order-id">${escapeHtml(order.outTradeNo)}</span>
+          <h3>${escapeHtml(order.productName || "未知商品")}</h3>
+          <p>${escapeHtml(order.planLabel || "默认套餐")} · ${escapeHtml(categoryName(product?.category || order.productCategory || "market"))}</p>
+        </div>
+        <div class="order-money">
+          <strong>¥${formatAmount(order.amount)}</strong>
+          <span class="${paid ? "status-good" : "status-bad"}">${orderStatusText(order.status)}</span>
+        </div>
+      </div>
+      <div class="order-card-meta">
+        <span>下单：${formatTime(order.createdAt)}</span>
+        <span>支付：${order.paidAt ? formatTime(order.paidAt) : "待支付"}</span>
+        <span>交付：${deliveryStatusText(order.deliveryStatus, order.status)}</span>
+      </div>
+      <div class="order-card-actions">
+        <a class="text-link" href="/orders?order=${encodeURIComponent(order.outTradeNo)}">查看明细</a>
+        <a class="text-link" href="/product/${productSlug(product || order.productName || order.productSlug || "")}">关联商品</a>
+      </div>
+    </article>
+  `;
+}
+
+function renderOrderDetail(order) {
+  const product = orderProduct(order);
+  const paid = order.status === "paid";
+  return `
+    <section class="table-panel order-detail-panel">
+      <div class="catalog-head">
+        <h2>订单明细</h2>
+        <a class="text-link" href="/orders">收起明细</a>
+      </div>
+      <div class="order-detail-grid">
+        ${detailItem("订单编号", escapeHtml(order.outTradeNo))}
+        ${detailItem("订单状态", `<span class="${paid ? "status-good" : "status-bad"}">${orderStatusText(order.status)}</span>`)}
+        ${detailItem("商品", `<a class="text-link" href="/product/${productSlug(product || order.productName || order.productSlug || "")}">${escapeHtml(order.productName || "未知商品")}</a>`)}
+        ${detailItem("套餐", escapeHtml(order.planLabel || "默认套餐"))}
+        ${detailItem("订单金额", `¥${formatAmount(order.amount)}`)}
+        ${detailItem("支付方式", paymentMethodText(order.paymentMethod))}
+        ${detailItem("下单时间", formatTime(order.createdAt))}
+        ${detailItem("支付时间", order.paidAt ? formatTime(order.paidAt) : "待支付")}
+        ${detailItem("支付宝交易号", escapeHtml(order.alipayTradeNo || "暂无"))}
+        ${detailItem("交付状态", deliveryStatusText(order.deliveryStatus, order.status))}
+      </div>
+      <div class="delivery-box">
+        <span>商品交付</span>
+        <strong>${deliveryStatusText(order.deliveryStatus, order.status)}</strong>
+        <p>${escapeHtml(order.deliveryMessage || deliveryMessage(order))}</p>
+      </div>
+    </section>
+  `;
+}
+
+function detailItem(label, value) {
+  return `
+    <div class="detail-item">
+      <span>${label}</span>
+      <strong>${value}</strong>
     </div>
   `;
+}
+
+function selectedOrderFromRoute() {
+  const orderNo = currentQueryParams().get("order");
+  return orderNo ? myOrders.find((order) => order.outTradeNo === orderNo) : null;
+}
+
+function orderProduct(order) {
+  return catalogProducts.find((product) => productSlug(product) === (order.productSlug || productSlug(order.productName || "")))
+    || catalogProducts.find((product) => product.name === order.productName)
+    || null;
+}
+
+function formatAmount(value) {
+  const amount = Number(value || 0);
+  return Number.isInteger(amount) ? String(amount) : amount.toFixed(2);
+}
+
+function paymentMethodText(method) {
+  return method === "alipay" ? "支付宝" : method || "未知";
+}
+
+function deliveryStatusText(status, orderStatus) {
+  if (orderStatus !== "paid") return "待支付";
+  return {
+    waiting_payment: "待支付",
+    pending_delivery: "待交付",
+    processing: "交付处理中",
+    delivered: "已交付",
+    after_sale: "售后中"
+  }[status] || "待交付";
+}
+
+function deliveryMessage(order) {
+  if (order.status !== "paid") return "完成支付后，商品会进入交付流程。";
+  return "支付已确认，商品交付正在处理中。请留意订单状态或联系客服获取凭证。";
 }
 
 function adminUserRow(user) {
@@ -1427,12 +1655,14 @@ function helpCard(title, text) {
 }
 
 function formatTime(value) {
+  const date = new Date(value);
+  if (!value || Number.isNaN(date.getTime())) return "暂无";
   return new Intl.DateTimeFormat("zh-CN", {
     month: "2-digit",
     day: "2-digit",
     hour: "2-digit",
     minute: "2-digit"
-  }).format(new Date(value));
+  }).format(date);
 }
 
 function renderEmptyResult() {
@@ -1604,7 +1834,7 @@ function buildJsonLd(route, meta) {
 }
 
 function productSlug(product) {
-  return product.name.toLowerCase().replace(/\+/g, "plus").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  return String(product?.name || product || "").toLowerCase().replace(/\+/g, "plus").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 }
 
 function categoryName(categoryId) {
@@ -1707,3 +1937,4 @@ function featureIcon(index) {
 
 window.addEventListener("hashchange", render);
 render();
+loadCatalogData();
